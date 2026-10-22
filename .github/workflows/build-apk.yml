@@ -1,0 +1,49 @@
+name: Compilar APK Lista de Compras
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Descomprimir zip si hace falta
+        run: |
+          if [ -z "$(find . -name settings.gradle -not -path './.git/*' | head -n 1)" ]; then
+            Z=$(find . -name '*.zip' -not -path './.git/*' | head -n 1)
+            if [ -n "$Z" ]; then
+              echo "Descomprimiendo $Z"
+              mkdir -p proyecto && unzip -o "$Z" -d proyecto
+            fi
+          fi
+
+      - name: Compilar APK
+        run: |
+          F=$(find . -name settings.gradle -not -path './.git/*' | head -n 1)
+          if [ -z "$F" ]; then
+            echo "No hay settings.gradle ni zip en el repositorio. Subi ListaDeCompras.zip a la raiz."
+            echo "=== ARCHIVOS ==="
+            find . -type f -not -path './.git/*' | sort | head -40
+            exit 1
+          fi
+          cd "$(dirname "$F")"
+          echo "Proyecto en: $(pwd)"
+          gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ListaDeCompras-APK
+          path: '**/build/outputs/apk/debug/*.apk'
